@@ -49,3 +49,7 @@ endif()
 # Headless DSP validation (no JUCE): cmake --build build --target mk_dsp_test && ./build/mk_dsp_test
 add_executable(mk_dsp_test Tests/dsp_test.cpp)
 target_include_directories(mk_dsp_test PRIVATE Source)
+if(MSVC)
+    # main() holds dozens of Engine-sized Rig objects on the stack; MSVC's default 1 MB overflows (0xC00000FD), Linux's 8 MB does not.
+    target_link_options(mk_dsp_test PRIVATE /STACK:67108864)
+endif()
