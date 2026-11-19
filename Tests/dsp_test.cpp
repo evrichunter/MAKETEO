@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstring>
+#include <iostream>
 #include <map>
 #include <memory>
 #include <random>
@@ -12,7 +13,13 @@
 
 using namespace mk;
 static int fails = 0;
-#define CHECK(cond, ...) do { if (cond) std::printf("  PASS  "); else { std::printf("  FAIL  "); ++fails; } std::printf(__VA_ARGS__); std::printf("\n"); } while (0)
+static std::vector<std::string> failedChecks;
+#define CHECK(cond, ...) do { \
+    const bool ok_ = (cond); char buf_[512]; std::snprintf (buf_, sizeof buf_, __VA_ARGS__); \
+    std::printf ("  %s  %s\n", ok_ ? "PASS" : "FAIL", buf_); \
+    if (! ok_) { ++fails; failedChecks.push_back ("line " + std::to_string (__LINE__) + ": " + buf_); \
+                 std::cerr << "[CHECK FAILED] dsp_test.cpp:" << __LINE__ << ": " << buf_ << std::endl; } \
+} while (0)
 
 static std::map<std::string, int>& idMap() { static std::map<std::string, int> m; if (m.empty()) for (int i = 0; i < kNumParams; ++i) m[paramSpecs()[i].id] = i; return m; }
 struct Rig
@@ -40,7 +47,12 @@ struct Rig
     }
 };
 static std::vector<float> sine (double fs, double f, double a, int n) { std::vector<float> x ((size_t) n); for (int i = 0; i < n; ++i) x[(size_t) i] = (float) (a * std::sin (2 * kPi * f * i / fs)); return x; }
-static std::vector<float> noise (int n, float a, unsigned seed = 1) { std::mt19937 g (seed); std::uniform_real_distribution<float> d (-a, a); std::vector<float> x ((size_t) n); for (auto& s : x) s = d (g); return x; }
+static std::vector<float> noise (int n, float a, unsigned seed = 1)
+{
+    std::mt19937 g (seed); std::vector<float> x ((size_t) n);
+    for (auto& s : x) s = (float) (a * ((double) g() * (1.0 / 4294967296.0) * 2.0 - 1.0));
+    return x;
+}
 static double peak (const std::vector<float>& a, size_t from = 0) { double m = 0; for (size_t i = from; i < a.size(); ++i) m = std::max (m, (double) std::fabs (a[i])); return m; }
 static double rms (const std::vector<float>& a, size_t from, size_t to) { double s = 0; for (size_t i = from; i < to && i < a.size(); ++i) s += a[i] * (double) a[i]; return std::sqrt (s / std::max<size_t> (1, to - from)); }
 static double maxDiff (const std::vector<float>& a, const std::vector<float>& b, size_t from = 0) { double m = 0; for (size_t i = from; i < a.size(); ++i) m = std::max (m, (double) std::fabs (a[i] - b[i])); return m; }
@@ -72,6 +84,7 @@ static std::vector<float> voice (double fs, double f0, int n, double amp = 0.25)
 
 int main (int argc, char** argv)
 {
+    std::setvbuf (stdout, nullptr, _IONBF, 0);
     if (argc > 1 && ! std::strcmp (argv[1], "--docs"))
     {
         static const char* gn[] = { "I/O", "Autotune Pro", "Vocal Rider", "Hollywood Preamp", "U47 Microphone", "Revival", "Parametric EQ (8 band)", "De-Esser High", "De-Esser Low", "1176 Rev A", "LA-2A", "SSL 4000 J EQ", "Maag EQ4", "Reverb", "Delay", "New York Compression", "Brightness Engine", "Doubler", "Tube Saturation" };
@@ -384,6 +397,12 @@ int main (int argc, char** argv)
             std::printf ("  info  block %3d: %.2f s of audio in %.3f s = %.1f %% of one core\n", blk, 10.0, sec, 100.0 * sec / 10.0);
             if (blk == 64) CHECK (sec / 10.0 < 0.5, "worst-case all-on chain uses %.1f %% of one core (< 50 %% required)", 100.0 * sec / 10.0);
         }
+    }
+    if (fails)
+    {
+        std::cerr << "\n[DSP TEST] " << fails << " check(s) failed:\n";
+        for (const auto& s : failedChecks) std::cerr << "  - " << s << "\n";
+        std::cerr.flush();
     }
     std::printf ("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL CHECKS PASSED", fails, fails == 1 ? "" : "s");
     return fails ? 1 : 0;
