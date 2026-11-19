@@ -10,7 +10,9 @@ jobs:
       - name: DSP validation (headless, MSVC build)
         run: |
           cmake --build build --config Release --target mk_dsp_test
+          if ($LASTEXITCODE -ne 0) { Write-Host "BUILD of mk_dsp_test FAILED"; exit $LASTEXITCODE }
           ./build/Release/mk_dsp_test.exe
+          if ($LASTEXITCODE -ne 0) { Write-Host "mk_dsp_test exited with $LASTEXITCODE (see [CHECK FAILED] lines above)"; exit $LASTEXITCODE }
       - name: Build VST3
         run: cmake --build build --config Release --target Maketeo_VST3 --parallel
       - name: Upload VST3
