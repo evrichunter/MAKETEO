@@ -645,7 +645,8 @@ void MaketeoEditor::showSettings()
 }
 void MaketeoEditor::openAdv (mk::Group g, const juce::String& title)
 {
-    adv = std::make_unique<AdvPanel> (*this, g, title, [this] { juce::MessageManager::callAsync ([sp = juce::Component::SafePointer<MaketeoEditor> (this)] { if (sp != nullptr) sp->adv.reset(); }); });
+    juce::Component::SafePointer<MaketeoEditor> self (this); // created outside the lambdas: MSVC resolves 'this' wrongly in a nested init-capture
+    adv = std::make_unique<AdvPanel> (*this, g, title, [self] { juce::MessageManager::callAsync ([self] { if (self != nullptr) self->adv.reset(); }); });
     content.addAndMakeVisible (*adv); adv->setBounds (content.getLocalBounds()); content.sendLookAndFeelChange(); adv->toFront (false);
 }
 void MaketeoEditor::timerCallback()
